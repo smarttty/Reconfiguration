@@ -1,38 +1,38 @@
 <div class="container">
   <div class="row">
     <div class="col-sm">
-        <h2>Ввод данных</h2>
+        <h2>Input</h2>
         <div class="row">
-            <label for="criticalCount">Число критичных элементов</label>
+            <label for="criticalCount">Number of critical elements</label>
             <Input @id="criticalCount" @type="text" @value={{this.criticalCount}} @size="50" />
         </div>
         <div class="row">
-            <label for="middleCriticalCount">Число среднекритичных элементов</label>
+            <label for="middleCriticalCount">Number of middle-critical elements</label>
             <Input @id="middleCriticalCount" @type="text" @value={{this.middleCriticalCount}} @size="50" />
         </div>
         <div class="row">
-            <label for="notCriticalCount">Число некритичных элементов</label>
+            <label for="notCriticalCount">Number of non-critical elements</label>
             <Input @id="notCriticalCount" @type="text" @value={{this.notCriticalCount}} @size="50" />
         </div>
-        <div class="row">
-            <label for="deltaP">ΔP - диагностическая нагрузка</label><br>
+        <div class="row" style="display: block;">
+            <label for="deltaP">ΔP</label><br>
             <Input @id="deltaP" @type="text" @value={{this.deltaP}} @size="50" />
         </div>
-        <div class="row">
-            <label for="pPorog">P - пороговое значение мощности</label><br>
+        <div class="row" style="display: block;">
+            <label for="pPorog">Threshold P</label><br>
             <Input @id="pPorog" @type="text" @value={{this.pPorog}} @size="50" />
         </div>
-        <div class="row">
-            <label for="tInterval">Интервал Δt - интервал диагностирования</label><br>
+        <div class="row" style="display: block;">
+            <label for="tInterval">Diagnosis interval Δt</label><br>
             <Input @id="tInterval" @type="text" @value={{this.tInterval}} @size="50" />
         </div>
         <br>
         <div class="row">
-            <button class="btn btn-primary" {{action 'computeSituation'}}>Расчёт</button>
+            <button class="btn btn-primary" {{action 'computeSituation'}}>Computation</button>
         </div>
     </div>
     <div class="col-sm">
-      <h2>Расчёт</h2>
+      <h2>Computation</h2>
       {{#each-in this.diagnosticObjects as |key value|}}
         <h3>{{value.name}}</h3>
         <div class="row">
@@ -46,6 +46,6 @@
     </div>
   </div>
   <div class="row">
-        {{ember-chart type='scatter' data=graphData options=options width=200 height=200}}
+        {{ember-chart type='scatter' data=graphData options=options width=200 height=300}}
   </div>
 </div>

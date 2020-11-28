@@ -2,15 +2,15 @@ import Controller from '@ember/controller';
 import { computed, set } from '@ember/object';
 import { copy } from '@ember/object/internals';
 const translations = {
-    'criticalCount': 'Критичные элементы',
-    'middleCriticalCount': 'Элементы средней критичности',
-    'notCriticalCount': 'Некритичные элементы',
+    'criticalCount': 'Critical',
+    'middleCriticalCount': 'Middle-critical',
+    'notCriticalCount': 'Non-critical',
 };
 export default Controller.extend({
     criticalCount: 0,
     middleCriticalCount: 0,
     notCriticalCount: 0,
-    deltaP: 10,
+    deltaP: 1,
     pPorog: 30,
     tInterval: 1,
     options: {
@@ -85,6 +85,7 @@ export default Controller.extend({
     },
 
     getWorkingObjectsCount(objects) {
+        let pPorogInt = parseInt(this.pPorog);
         let workingObjectsCount = 0;
         Object.keys(objects).forEach((objectType) => {
             let workingObjectsByTypeCount = objects[objectType].data.reduce((workingCount, object) => {
@@ -145,7 +146,7 @@ export default Controller.extend({
 
         let graphData = [];
 
-        let deltaPInt = parseInt(this.deltaP);
+        let deltaPInt = parseFloat(this.deltaP);
 
         let pPorogInt = parseInt(this.pPorog);
 
@@ -170,7 +171,6 @@ export default Controller.extend({
                 return avaliableWorkerChecks > 0;
             });
 
-            console.log(checksNeededCount, availableChecks, copy(currentIterationWorkers));
             currentIterationWorkers.forEach((worker) => {
                 worker.currentIterationKoff = (worker.currentPowerLevel + (100 - worker.currentCPULevel)) / (2 * 100);
                 commonKoff += worker.currentIterationKoff;
@@ -246,10 +246,6 @@ export default Controller.extend({
                 "x" : tStart,
                 "y" : workingCount,
             });
-            console.log({
-                "x" : tStart,
-                "y" : workingCount,
-            });
             tStart += parseInt(this.tInterval);
             iterationNumber++;
             currentIterationMiddleWorkers = this.getCurrentIterationMiddleWorkers(computingObjects, middleWorkersCount, iterationNumber).slice(0);
@@ -277,7 +273,7 @@ export default Controller.extend({
 
         let graphData = [];
 
-        let deltaPInt = parseInt(this.deltaP);
+        let deltaPInt = parseFloat(this.deltaP);
 
         let pPorogInt = parseInt(this.pPorog);
 
@@ -292,7 +288,6 @@ export default Controller.extend({
         let availableChecks = notCriticalChecks + middleCriticalChecks;
         while(checksNeededCount < availableChecks) {
             let currentIterationWorkers = [].concat(currentIterationMiddleWorkers, computingObjects.notCriticalObjects.data.slice(0));
-            console.log(checksNeededCount, availableChecks, copy(currentIterationWorkers));
             currentIterationWorkers.sort((w1, w2) => {
                 if(w1.currentPowerLevel > w2.currentPowerLevel){
                     return -1;
@@ -342,27 +337,103 @@ export default Controller.extend({
 
     },
 
+    oneToAllSimpleAlgorithm(computingObjects){
+        let middleWorkersCount = (computingObjects.middleCriticalObjects.data.length
+            - Math.floor(computingObjects.middleCriticalObjects.data.length / 2));
+
+        let iterationNumber = 0;
+
+        let tStart = parseInt(this.tInterval);
+
+        let graphData = [];
+
+        let deltaPInt = parseFloat(this.deltaP);
+
+        let pPorogInt = parseInt(this.pPorog);
+
+        let currentIterationMiddleWorkers = this.getCurrentIterationMiddleWorkers(computingObjects, middleWorkersCount, iterationNumber).slice(0);
+        let notCriticalChecks = computingObjects.notCriticalObjects.data.reduce((accumulator, currentValue) => {
+            return accumulator + Math.floor((currentValue.currentPowerLevel - parseInt(this.pPorog)) / deltaPInt);
+        }, 0);
+        let middleCriticalChecks = currentIterationMiddleWorkers.reduce((accumulator, currentValue) => {
+            return accumulator + Math.floor((currentValue.currentPowerLevel - parseInt(this.pPorog)) / deltaPInt);
+        }, 0);
+        let checksNeededCount = computingObjects.criticalObjects.data.length + (computingObjects.middleCriticalObjects.data.length - currentIterationMiddleWorkers.length);
+        let availableChecks = notCriticalChecks + middleCriticalChecks;
+        while(checksNeededCount < availableChecks) {
+            let currentIterationWorkers = [].concat(currentIterationMiddleWorkers, computingObjects.notCriticalObjects.data.slice(0));
+            let checksToDistribute = checksNeededCount;
+            currentIterationWorkers.forEach((worker)=>{
+                let avaliableWorkerChecks = Math.floor((worker.currentPowerLevel - pPorogInt) / deltaPInt);
+                let currentChecks = 0;
+                if(checksToDistribute > 0 && avaliableWorkerChecks > 0){
+                    currentChecks = (checksToDistribute > avaliableWorkerChecks) ? avaliableWorkerChecks : checksToDistribute;
+                }
+                checksToDistribute-=currentChecks;
+                worker.currentPowerLevel -= ( currentChecks * deltaPInt);
+            });
+            let workingCount = 0;
+            Object.keys(computingObjects).forEach((groupName)=>{
+                if(groupName != 'criticalObjects'){
+                    workingCount += computingObjects[groupName].data.filter((object)=>{
+                        return object.currentPowerLevel > (pPorogInt + deltaPInt);
+                    }).length;
+                }
+            });
+            graphData.push({
+                "x" : tStart,
+                "y" : workingCount,
+            });
+            tStart += parseInt(this.tInterval);
+            iterationNumber++;
+            currentIterationMiddleWorkers = this.getCurrentIterationMiddleWorkers(computingObjects, middleWorkersCount, iterationNumber).slice(0);
+            notCriticalChecks = computingObjects.notCriticalObjects.data.reduce((accumulator, currentValue) => {
+                return accumulator + Math.floor((currentValue.currentPowerLevel - parseInt(this.pPorog)) / deltaPInt);
+            }, 0);
+            middleCriticalChecks = currentIterationMiddleWorkers.reduce((accumulator, currentValue) => {
+                return accumulator + Math.floor((currentValue.currentPowerLevel - parseInt(this.pPorog)) / deltaPInt);
+            }, 0);
+            checksNeededCount = computingObjects.criticalObjects.data.length + (computingObjects.middleCriticalObjects.data.length - currentIterationMiddleWorkers.length);
+            availableChecks = notCriticalChecks + middleCriticalChecks;
+        }
+        return graphData;
+
+
+
+    },
+
     actions: {
         computeSituation() {
 
             let computingObjectsForReconfiguration = copy(this.diagnosticObjects, true);
             let computingObjectsForOneToAll = copy(this.diagnosticObjects, true);
+            let computingObjectForSimpleOneToAll = copy(this.diagnosticObjects, true);
+            
 
 
             let graphData = {
                 datasets : [
                     {
-                        label : 'Реконфигурация',
+                        label : 'Reconfiguration',
                         data: this.reconfigurationAlgorithm(computingObjectsForReconfiguration),
                         backgroundColor: 'red',
                     },
                     {
-                        label : '1->Всех',
+                        label : '1 -> all (modified)',
                         data : this.oneToAllAlgorithm(computingObjectsForOneToAll),
                         backgroundColor: 'black',
                     },
+                    {
+                        label : '1 -> all',
+                        data : this.oneToAllSimpleAlgorithm(computingObjectForSimpleOneToAll),
+                        backgroundColor: 'yellow',
+                    }
                 ]
             }
+            console.log(JSON.stringify(graphData.datasets.reduce((accumulator, dataset)=>{
+                accumulator = accumulator.concat(dataset.data);
+                return accumulator;
+            }, [])));
             set(this, 'graphData', graphData);
 
 
